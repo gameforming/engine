@@ -1,72 +1,223 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-  <meta charset="UTF-8">
-  <title>HTML5 Game Engine</title>
-  <style>
-    body {
-      margin: 0;
-      display: flex;
-      height: 100vh;
-      font-family: Arial, sans-serif;
-      background: #1e1e1e;
-      color: white;
-    }
+<meta charset="UTF-8">
+<title>HTML5 Online Game Engine</title>
 
-    #left {
-      flex: 1;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #111;
-    }
+<style>
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+  background: #1e1e1e;
+  color: white;
+  font-family: Arial, sans-serif;
+}
 
-    #right {
-      width: 300px;
-      background: #2a2a2a;
-      padding: 10px;
-      box-sizing: border-box;
-    }
+#left {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #111;
+}
 
-    canvas {
-      background: #fff;
-      image-rendering: pixelated;
-      border: 2px solid black;
-    }
+#right {
+  width: 320px;
+  padding: 10px;
+  box-sizing: border-box;
+  background: #2a2a2a;
+}
 
-    button, input {
-      width: 100%;
-      margin-bottom: 10px;
-      padding: 6px;
-      font-size: 14px;
-    }
+canvas {
+  background: white;
+  image-rendering: pixelated;
+  border: 2px solid black;
+}
 
-    textarea {
-      width: 100%;
-      height: 200px;
-      background: #111;
-      color: #0f0;
-      font-family: monospace;
-      padding: 5px;
-      box-sizing: border-box;
-    }
-  </style>
+button, input {
+  width: 100%;
+  margin-bottom: 6px;
+  padding: 6px;
+}
+
+textarea {
+  width: 100%;
+  height: 200px;
+  background: #111;
+  color: #0f0;
+  font-family: monospace;
+  padding: 5px;
+  box-sizing: border-box;
+}
+</style>
 </head>
+
 <body>
 
-  <div id="left">
-    <canvas id="canvas" width="800" height="640"></canvas>
-  </div>
+<div id="left">
+  <canvas id="canvas" width="800" height="640"></canvas>
+</div>
 
-  <div id="right">
-    <h3>Tools</h3>
-    <input type="color" id="colorPicker" value="#000000">
-    <button id="clear">Clear Grid</button>
+<div id="right">
+  <h3>Tools</h3>
+  <button onclick="tool='pencil'">✏️ Potlood</button>
+  <button onclick="tool='eraser'">🧽 Gum</button>
+  <input type="color" id="color" value="#000000">
 
-    <h3>Code (later)</h3>
-    <textarea id="code">// hier komt later game-code</textarea>
-  </div>
+  <h3>Project</h3>
+  <button onclick="saveProject()">💾 Opslaan</button>
+  <button onclick="loadProject()">📂 Laden</button>
+  <button onclick="clearGrid()">🗑️ Clear</button>
 
-  <script src="main.js"></script>
+  <h3>Game Code</h3>
+  <textarea id="code">
+// voorbeeld:
+if (game.tick % 60 === 0) {
+  game.log("tick " + game.tick);
+}
+  </textarea>
+
+  <button onclick="runCode()">▶ Run Code</button>
+</div>
+
+<script>
+// =====================
+// CONFIG
+// =====================
+const TILE = 16;
+const GRID_W = 50;
+const GRID_H = 40;
+
+// =====================
+// CANVAS
+// =====================
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+// =====================
+// GRID
+// =====================
+let grid = [];
+function clearGrid() {
+  grid = [];
+  for (let y = 0; y < GRID_H; y++) {
+    grid[y] = [];
+    for (let x = 0; x < GRID_W; x++) {
+      grid[y][x] = null;
+    }
+  }
+}
+clearGrid();
+
+// =====================
+// INPUT
+// =====================
+let mouse = { x:0, y:0, down:false };
+let tool = "pencil";
+
+canvas.addEventListener("mousemove", e => {
+  mouse.x = Math.floor(e.offsetX / TILE);
+  mouse.y = Math.floor(e.offsetY / TILE);
+});
+canvas.addEventListener("mousedown", () => mouse.down = true);
+canvas.addEventListener("mouseup", () => mouse.down = false);
+canvas.addEventListener("mouseleave", () => mouse.down = false);
+
+// =====================
+// DRAWING
+// =====================
+const colorPicker = document.getElementById("color");
+
+function updateDraw() {
+  if (!mouse.down) return;
+  if (mouse.x < 0 || mouse.y < 0 || mouse.x >= GRID_W || mouse.y >= GRID_H) return;
+
+  if (tool === "pencil") grid[mouse.y][mouse.x] = colorPicker.value;
+  if (tool === "eraser") grid[mouse.y][mouse.x] = null;
+}
+
+// =====================
+// SAVE / LOAD
+// =====================
+function saveProject() {
+  localStorage.setItem("engine_grid", JSON.stringify(grid));
+  alert("Opgeslagen!");
+}
+
+function loadProject() {
+  const data = localStorage.getItem("engine_grid");
+  if (data) {
+    grid = JSON.parse(data);
+    alert("Geladen!");
+  }
+}
+
+// =====================
+// ENGINE SCRIPT
+// =====================
+let userFunction = null;
+
+function runCode() {
+  const code = document.getElementById("code").value;
+  try {
+    userFunction = new Function("game", code);
+    alert("Code actief!");
+  } catch (e) {
+    alert("Fout in code!");
+  }
+}
+
+// =====================
+// GAME OBJECT
+// =====================
+const game = {
+  tick: 0,
+  log: msg => console.log("[GAME]", msg),
+  grid: grid
+};
+
+// =====================
+// RENDER
+// =====================
+function render() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  for (let y=0; y<GRID_H; y++) {
+    for (let x=0; x<GRID_W; x++) {
+      if (grid[y][x]) {
+        ctx.fillStyle = grid[y][x];
+        ctx.fillRect(x*TILE, y*TILE, TILE, TILE);
+      }
+      ctx.strokeStyle = "#ddd";
+      ctx.strokeRect(x*TILE, y*TILE, TILE, TILE);
+    }
+  }
+}
+
+// =====================
+// GAME LOOP
+// =====================
+function loop() {
+  updateDraw();
+  render();
+
+  game.tick++;
+  game.grid = grid;
+
+  if (userFunction) {
+    try {
+      userFunction(game);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
 </body>
 </html>
